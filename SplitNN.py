@@ -20,10 +20,9 @@ for i in range(7):
 	batch.append(tf.identity(example['pixels']))
 	label.append(example['label'])
 
-label_hot = tf.one_hot(label, depth=10)
-
 batch = tf.stack(batch)
-batch.shape
+label = tf.stack(label)
+
 # plt.imshow(batch[0], cmap='gray')
 batch_flat = tf.reshape(batch, (*batch.shape,1))
 batch_flat.shape
@@ -41,6 +40,7 @@ client_model = keras.models.Sequential(
 client_opt = tf.keras.optimizers.SGD(learning_rate=0.1)
 
 with tf.GradientTape(persistent=True) as client_tape:
+	client_tape.reset()
 	client_pred = client_model(batch_flat)
 # payload_for_server = [client_pred, label]
 # ---------------------------------
@@ -55,6 +55,7 @@ server_model = keras.models.Sequential([
 ])
 
 with tf.GradientTape(persistent=True) as server_tape:
+	server_tape.reset()
 	server_tape.watch(client_pred)
 	out7 = server_model(client_pred)
 	cost = tf.keras.losses.SparseCategoricalCrossentropy()(label, out7)
@@ -69,3 +70,11 @@ client_gradients = client_tape.gradient(client_pred,
 										client_model.trainable_weights,
 										output_gradients=final_server_gradient)
 client_opt.apply_gradients(zip(client_gradients, client_model.trainable_weights))
+
+
+
+# tf.io.serialize_tensor([client_pred, tf.cast(label, 'float32')])
+
+
+msg = pickle.dumps([client_pred, label])
+len(msg)
